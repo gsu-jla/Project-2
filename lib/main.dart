@@ -4,6 +4,7 @@ import 'screens/settings_screen.dart';
 import 'screens/gallery/gallery_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/cart/shopping_cart_screen.dart';
+import 'screens/upload/upload_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -27,6 +28,7 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => const ProfileScreen(),
         '/settings': (context) => const SettingsScreen(),
         '/cart': (context) => const ShoppingCartScreen(),
+        '/upload': (context) => const UploadScreen(),
       },
     );
   }
