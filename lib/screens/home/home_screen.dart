@@ -136,6 +136,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showImagePreview(Map<String, dynamic> artwork) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: CachedNetworkImage(
+                imageUrl: artwork['imageUrl'],
+                fit: BoxFit.contain,
+                placeholder: (context, url) => const Center(
+                  child: CircularProgressIndicator(),
+                ),
+                errorWidget: (context, url, error) => const Center(
+                  child: Icon(Icons.error),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.close,
+                  color: Colors.white,
+                  size: 32,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,18 +216,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(12),
-                          ),
-                          child: CachedNetworkImage(
-                            imageUrl: artwork['imageUrl'],
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => const Center(
-                              child: CircularProgressIndicator(),
+                        child: GestureDetector(
+                          onTap: () => _showImagePreview(artwork),
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(12),
                             ),
-                            errorWidget: (context, url, error) => const Center(
-                              child: Icon(Icons.error),
+                            child: CachedNetworkImage(
+                              imageUrl: artwork['imageUrl'],
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              errorWidget: (context, url, error) => const Center(
+                                child: Icon(Icons.error),
+                              ),
                             ),
                           ),
                         ),
