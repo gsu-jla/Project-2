@@ -29,6 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
       case 2: // Profile
         Navigator.pushNamed(context, '/profile');
         break;
+      case 3: // Settings
+        Navigator.pushNamed(context, '/settings');
+        break;
       default:
         setState(() {
           _selectedIndex = index;
@@ -42,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
-          'Digital Art Mark...',
+          'Digital Art Marketplace',
           style: TextStyle(color: Colors.black87),
         ),
         backgroundColor: Colors.deepPurple[100],
@@ -70,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         itemCount: _artworks.length,
         itemBuilder: (context, index) {
+          final artwork = _artworks[index];
           return Card(
             elevation: 2,
             shape: RoundedRectangleBorder(
@@ -101,7 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _artworks[index]['title']!,
+                        artwork['title']!,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -109,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _artworks[index]['artist']!,
+                        artwork['artist']!,
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: 14,
@@ -117,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _artworks[index]['price']!,
+                        artwork['price']!,
                         style: const TextStyle(
                           color: Colors.deepPurple,
                           fontWeight: FontWeight.bold,
@@ -140,6 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
@@ -152,6 +157,10 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
             label: 'Profile',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
         selectedItemColor: Colors.deepPurple,
