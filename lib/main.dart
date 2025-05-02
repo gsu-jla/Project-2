@@ -5,6 +5,8 @@ import 'screens/gallery/gallery_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/cart/shopping_cart_screen.dart';
 import 'screens/upload/upload_screen.dart';
+import 'screens/auth/sign_in_screen.dart';
+import 'screens/auth/sign_up_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,7 +23,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      initialRoute: '/',
+      initialRoute: '/signin',
       routes: {
         '/': (context) => const HomeScreen(),
         '/gallery': (context) => const GalleryScreen(),
@@ -29,6 +31,8 @@ class MyApp extends StatelessWidget {
         '/settings': (context) => const SettingsScreen(),
         '/cart': (context) => const ShoppingCartScreen(),
         '/upload': (context) => const UploadScreen(),
+        '/signin': (context) => const SignInScreen(),
+        '/signup': (context) => const SignUpScreen(),
       },
     );
   }

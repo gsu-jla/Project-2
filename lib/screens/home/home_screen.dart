@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../services/art_service.dart';
 import '../../services/favorite_service.dart';
+import '../../services/cart_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,6 +14,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ArtService _artService = ArtService();
   late final FavoriteService _favoriteService;
+  late final CartService _cartService;
   List<Map<String, dynamic>> _artworks = [];
   bool _isLoading = true;
   int _selectedIndex = 0;
@@ -25,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initializeServices() async {
     _favoriteService = await FavoriteService.create();
+    _cartService = await CartService.create();
     _loadArtworks();
   }
 
@@ -89,27 +92,67 @@ class _HomeScreenState extends State<HomeScreen> {
     return _favoriteService.isFavorite(artworkId);
   }
 
+  bool _isPurchased(int artworkId) {
+    return _cartService.isPurchased(artworkId);
+  }
+
+  Future<void> _showPurchaseDialog(Map<String, dynamic> artwork) async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Purchase Artwork'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Title: ${artwork['title']}'),
+            Text('Artist: ${artwork['artist']}'),
+            Text('Price: ${artwork['price']}'),
+            const SizedBox(height: 16),
+            const Text('Are you sure you want to purchase this artwork?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _cartService.purchase(artwork['id']);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Purchase successful!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              setState(() {}); // Refresh the UI
+            },
+            child: const Text('Purchase'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Digital Art Marketplace',
-          style: TextStyle(color: Colors.black87),
-        ),
         backgroundColor: Colors.deepPurple[100],
         elevation: 0,
+        title: const Text(
+          'Art Gallery',
+          style: TextStyle(color: Colors.black87),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.search, color: Colors.black87),
             onPressed: () {
               // TODO: Implement search
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
-            onPressed: () => Navigator.pushNamed(context, '/cart'),
           ),
         ],
       ),
@@ -210,6 +253,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ],
                             ),
+                            if (!_isPurchased(artwork['id']))
+                              Center(
+                                child: ElevatedButton(
+                                  onPressed: () => _showPurchaseDialog(artwork),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.deepPurple,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: const Text('Buy Now'),
+                                ),
+                              ),
+                            if (_isPurchased(artwork['id']))
+                              const Center(
+                                child: Text(
+                                  'Purchased',
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
