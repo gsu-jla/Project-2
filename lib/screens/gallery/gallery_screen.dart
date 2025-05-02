@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../services/art_service.dart';
+import '../../services/favorite_service.dart';
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
@@ -12,6 +13,7 @@ class GalleryScreen extends StatefulWidget {
 class _GalleryScreenState extends State<GalleryScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final ArtService _artService = ArtService();
+  late final FavoriteService _favoriteService;
   List<Map<String, dynamic>> _artworks = [];
   bool _isLoading = true;
 
@@ -19,7 +21,26 @@ class _GalleryScreenState extends State<GalleryScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    _favoriteService = await FavoriteService.create();
     _loadArtworks();
+  }
+
+  void _toggleFavorite(int artworkId) {
+    setState(() {
+      _favoriteService.toggleFavorite(artworkId);
+    });
+  }
+
+  bool _isFavorite(int artworkId) {
+    return _favoriteService.isFavorite(artworkId);
+  }
+
+  List<Map<String, dynamic>> get _favoriteArtworks {
+    return _artworks.where((artwork) => _favoriteService.isFavorite(artwork['id'])).toList();
   }
 
   Future<void> _loadArtworks() async {
@@ -96,103 +117,117 @@ class _GalleryScreenState extends State<GalleryScreen> with SingleTickerProvider
                 controller: _tabController,
                 children: [
                   // Favorites Tab
-                  GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.8,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                    ),
-                    itemCount: _artworks.length,
-                    itemBuilder: (context, index) {
-                      final artwork = _artworks[index];
-                      return Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(12),
-                                ),
-                                child: CachedNetworkImage(
-                                  imageUrl: artwork['imageUrl'],
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                  errorWidget: (context, url, error) => const Center(
-                                    child: Icon(Icons.error),
-                                  ),
-                                ),
+                  _favoriteArtworks.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No favorites yet. Add some from the home screen!',
+                            style: TextStyle(fontSize: 16),
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      : GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.8,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                          ),
+                          itemCount: _favoriteArtworks.length,
+                          itemBuilder: (context, index) {
+                            final artwork = _favoriteArtworks[index];
+                            return Card(
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    artwork['title'],
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    artwork['artist'],
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        artwork['price'],
-                                        style: const TextStyle(
-                                          color: Colors.deepPurple,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(12),
+                                      ),
+                                      child: CachedNetworkImage(
+                                        imageUrl: artwork['imageUrl'],
+                                        fit: BoxFit.cover,
+                                        placeholder: (context, url) => const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                        errorWidget: (context, url, error) => const Center(
+                                          child: Icon(Icons.error),
                                         ),
                                       ),
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.favorite_border,
-                                            size: 16,
-                                            color: Colors.grey,
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          artwork['title'],
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            artwork['likes'].toString(),
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          artwork['artist'],
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              artwork['price'],
+                                              style: const TextStyle(
+                                                color: Colors.deepPurple,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                            Row(
+                                              children: [
+                                                IconButton(
+                                                  icon: Icon(
+                                                    _isFavorite(artwork['id'])
+                                                        ? Icons.favorite
+                                                        : Icons.favorite_border,
+                                                    size: 20,
+                                                    color: _isFavorite(artwork['id'])
+                                                        ? Colors.red
+                                                        : Colors.grey,
+                                                  ),
+                                                  onPressed: () => _toggleFavorite(artwork['id']),
+                                                ),
+                                                Text(
+                                                  artwork['likes'].toString(),
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                   // Collections Tab (placeholder)
                   const Center(
                     child: Text('Collections Coming Soon'),

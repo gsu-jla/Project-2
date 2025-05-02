@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../services/art_service.dart';
+import '../../services/favorite_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -10,14 +11,20 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
   final ArtService _artService = ArtService();
+  late final FavoriteService _favoriteService;
   List<Map<String, dynamic>> _artworks = [];
   bool _isLoading = true;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    _favoriteService = await FavoriteService.create();
     _loadArtworks();
   }
 
@@ -70,6 +77,16 @@ class _HomeScreenState extends State<HomeScreen> {
           _selectedIndex = index;
         });
     }
+  }
+
+  void _toggleFavorite(int artworkId) {
+    setState(() {
+      _favoriteService.toggleFavorite(artworkId);
+    });
+  }
+
+  bool _isFavorite(int artworkId) {
+    return _favoriteService.isFavorite(artworkId);
   }
 
   @override
@@ -170,12 +187,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 Row(
                                   children: [
-                                    const Icon(
-                                      Icons.favorite_border,
-                                      size: 16,
-                                      color: Colors.grey,
+                                    IconButton(
+                                      icon: Icon(
+                                        _isFavorite(artwork['id'])
+                                            ? Icons.favorite
+                                            : Icons.favorite_border,
+                                        size: 20,
+                                        color: _isFavorite(artwork['id'])
+                                            ? Colors.red
+                                            : Colors.grey,
+                                      ),
+                                      onPressed: () => _toggleFavorite(artwork['id']),
                                     ),
-                                    const SizedBox(width: 4),
                                     Text(
                                       artwork['likes'].toString(),
                                       style: const TextStyle(
@@ -210,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.favorite_border),
+            icon: Icon(Icons.favorite),
             label: 'Gallery',
           ),
           BottomNavigationBarItem(
