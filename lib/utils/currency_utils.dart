@@ -6,11 +6,29 @@ class CurrencyUtils {
   static final CurrencyService _currencyService = CurrencyService();
   static final UserPreferencesService _prefsService = UserPreferencesService();
 
+  static const Map<String, String> _currencySymbols = {
+    'USD': '\$',
+    'EUR': '€',
+    'GBP': '£',
+    'JPY': '¥',
+    'AUD': 'A\$',
+    'CAD': 'C\$',
+    'CHF': 'Fr',
+    'CNY': '¥',
+    'INR': '₹',
+  };
+
+  static String getCurrencySymbol(String currencyCode) {
+    return _currencySymbols[currencyCode] ?? currencyCode;
+  }
+
   static Future<String> formatPrice(double price, {String? currency}) async {
     final preferredCurrency = currency ?? await _prefsService.getPreferredCurrency();
+    final symbol = getCurrencySymbol(preferredCurrency);
     final format = NumberFormat.currency(
       locale: 'en_US',
-      symbol: preferredCurrency,
+      symbol: symbol,
+      decimalDigits: 2,
     );
     return format.format(price);
   }

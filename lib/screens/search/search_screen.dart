@@ -3,6 +3,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../services/art_service.dart';
 import '../../services/search_service.dart';
 import '../../services/favorite_service.dart';
+import '../../services/user_preferences_service.dart';
+import '../../services/currency_service.dart';
+import '../../utils/currency_utils.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -15,6 +18,8 @@ class _SearchScreenState extends State<SearchScreen> {
   late final ArtService _artService;
   late final SearchService _searchService;
   late final FavoriteService _favoriteService;
+  final UserPreferencesService _prefsService = UserPreferencesService();
+  final CurrencyService _currencyService = CurrencyService();
   final _searchController = TextEditingController();
   List<Map<String, dynamic>> _artworks = [];
   List<Map<String, dynamic>> _searchResults = [];
@@ -88,6 +93,18 @@ class _SearchScreenState extends State<SearchScreen> {
 
   bool _isFavorite(int artworkId) {
     return _favoriteService.isFavorite(artworkId);
+  }
+
+  Future<String> _getFormattedPrice(double price) async {
+    try {
+      final preferredCurrency = await _prefsService.getPreferredCurrency();
+      final symbol = CurrencyUtils.getCurrencySymbol(preferredCurrency);
+      final formattedPrice = await CurrencyUtils.formatAndConvertPrice(price, 'USD');
+      return formattedPrice;
+    } catch (e) {
+      print('Error formatting price: $e');
+      return CurrencyUtils.formatPrice(price, currency: 'USD');
+    }
   }
 
   @override
@@ -244,41 +261,24 @@ class _SearchScreenState extends State<SearchScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 4),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          artwork['price'],
+                                    FutureBuilder<String>(
+                                      future: _getFormattedPrice(artwork['price']),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.connectionState == ConnectionState.waiting) {
+                                          return const SizedBox(
+                                            height: 20,
+                                            child: Center(child: CircularProgressIndicator()),
+                                          );
+                                        }
+                                        return Text(
+                                          snapshot.data ?? 'Loading...',
                                           style: const TextStyle(
                                             color: Colors.deepPurple,
                                             fontWeight: FontWeight.bold,
                                             fontSize: 16,
                                           ),
-                                        ),
-                                        Row(
-                                          children: [
-                                            IconButton(
-                                              icon: Icon(
-                                                _isFavorite(artwork['id'])
-                                                    ? Icons.favorite
-                                                    : Icons.favorite_border,
-                                                size: 20,
-                                                color: _isFavorite(artwork['id'])
-                                                    ? Colors.red
-                                                    : Colors.grey,
-                                              ),
-                                              onPressed: () => _toggleFavorite(artwork['id']),
-                                            ),
-                                            Text(
-                                              artwork['likes'].toString(),
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                        );
+                                      },
                                     ),
                                   ],
                                 ),

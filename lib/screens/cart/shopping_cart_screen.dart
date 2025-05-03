@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../services/cart_service.dart';
+import '../../services/art_service.dart';
+import '../../services/user_preferences_service.dart';
+import '../../services/currency_service.dart';
+import '../../utils/currency_utils.dart';
 
 class ShoppingCartScreen extends StatefulWidget {
   const ShoppingCartScreen({super.key});
@@ -8,259 +14,205 @@ class ShoppingCartScreen extends StatefulWidget {
 }
 
 class _ShoppingCartScreenState extends State<ShoppingCartScreen> {
-  final List<Map<String, dynamic>> _cartItems = [
-    {
-      'title': 'Artwork Title',
-      'artist': 'Artist Name',
-      'price': 99.99,
-      'quantity': 1,
-    },
-    {
-      'title': 'Artwork Title',
-      'artist': 'Artist Name',
-      'price': 99.99,
-      'quantity': 1,
-    },
-    {
-      'title': 'Artwork Title',
-      'artist': 'Artist Name',
-      'price': 99.99,
-      'quantity': 1,
-    },
-  ];
+  late final CartService _cartService;
+  late final ArtService _artService;
+  final UserPreferencesService _prefsService = UserPreferencesService();
+  final CurrencyService _currencyService = CurrencyService();
+  List<Map<String, dynamic>> _cartItems = [];
+  bool _isLoading = true;
 
-  double get _subtotal => _cartItems.fold(
-        0,
-        (sum, item) => sum + (item['price'] * item['quantity']),
-      );
+  Future<String> _getFormattedPrice(double price) async {
+    try {
+      final preferredCurrency = await _prefsService.getPreferredCurrency();
+      final symbol = CurrencyUtils.getCurrencySymbol(preferredCurrency);
+      final formattedPrice = await CurrencyUtils.formatAndConvertPrice(price, 'USD');
+      return formattedPrice;
+    } catch (e) {
+      print('Error formatting price: $e');
+      return CurrencyUtils.formatPrice(price, currency: 'USD');
+    }
+  }
 
-  double get _shipping => 0.00;
-  double get _total => _subtotal + _shipping;
+  @override
+  void initState() {
+    super.initState();
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    _cartService = await CartService.create();
+    _artService = await ArtService.create();
+    await _loadCart();
+  }
+
+  Future<void> _loadCart() async {
+    setState(() => _isLoading = true);
+    try {
+      final items = await _cartService.getCart();
+      setState(() {
+        _cartItems = items;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading cart: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _removeFromCart(int artworkId) async {
+    try {
+      _cartService.removeFromCart(artworkId);
+      await _loadCart();
+    } catch (e) {
+      print('Error removing from cart: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.deepPurple[100],
-        elevation: 0,
-        title: const Text(
-          'Shopping Cart',
-          style: TextStyle(color: Colors.black87),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
+        title: const Text('Shopping Cart'),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _cartItems.length,
-              itemBuilder: (context, index) {
-                final item = _cartItems[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _cartItems.isEmpty
+              ? const Center(
+                  child: Text(
+                    'Your cart is empty',
+                    style: TextStyle(fontSize: 16),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.image,
-                              size: 32,
-                              color: Colors.grey,
+                )
+              : Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _cartItems.length,
+                        itemBuilder: (context, index) {
+                          final artwork = _cartItems[index];
+                          return Card(
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item['title'],
+                            child: ListTile(
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: CachedNetworkImage(
+                                  imageUrl: artwork['imageUrl'],
+                                  width: 60,
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                  errorWidget: (context, url, error) => const Center(
+                                    child: Icon(Icons.error),
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                artwork['title'],
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item['artist'],
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 14,
-                                ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    artwork['artist'],
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                  FutureBuilder<String>(
+                                    future: _getFormattedPrice(artwork['price']),
+                                    builder: (context, snapshot) {
+                                      if (snapshot.connectionState == ConnectionState.waiting) {
+                                        return const SizedBox(
+                                          height: 20,
+                                          child: Center(child: CircularProgressIndicator()),
+                                        );
+                                      }
+                                      return Text(
+                                        snapshot.data ?? 'Loading...',
+                                        style: const TextStyle(
+                                          color: Colors.deepPurple,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '\$${item['price'].toStringAsFixed(2)}',
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () {
+                                  setState(() {
+                                    _cartService.removeFromCart(artwork['id'] as int);
+                                  });
+                                  _loadCart();
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.1),
+                            spreadRadius: 1,
+                            blurRadius: 1,
+                            offset: const Offset(0, -1),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Total:',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          FutureBuilder<String>(
+                            future: _getFormattedPrice(
+                              _cartItems.fold<double>(
+                                0,
+                                (sum, item) => sum + item['price'],
+                              ),
+                            ),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const SizedBox(
+                                  height: 20,
+                                  child: Center(child: CircularProgressIndicator()),
+                                );
+                              }
+                              return Text(
+                                snapshot.data ?? 'Loading...',
                                 style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
                                   color: Colors.deepPurple,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
                                 ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
-                        ),
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: () {
-                                setState(() {
-                                  if (item['quantity'] > 1) {
-                                    item['quantity']--;
-                                  }
-                                });
-                              },
-                            ),
-                            Text(
-                              '${item['quantity']}',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: () {
-                                setState(() {
-                                  item['quantity']++;
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () {
-                            setState(() {
-                              _cartItems.removeAt(index);
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 10,
-                  offset: const Offset(0, -5),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Subtotal',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    Text(
-                      '\$${_subtotal.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Shipping',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    Text(
-                      '\$${_shipping.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Divider(),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Total',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      '\$${_total.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.deepPurple,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Implement checkout
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurple,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: const Text(
-                      'Proceed to Checkout',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 } 

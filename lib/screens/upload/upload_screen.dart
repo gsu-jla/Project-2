@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../services/art_service.dart';
+import '../../services/user_preferences_service.dart';
+import '../../services/currency_service.dart';
+import '../../utils/currency_utils.dart';
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -16,8 +19,11 @@ class _UploadScreenState extends State<UploadScreen> {
   final _priceController = TextEditingController();
   final _descriptionController = TextEditingController();
   late final ArtService _artService;
+  final UserPreferencesService _prefsService = UserPreferencesService();
+  final CurrencyService _currencyService = CurrencyService();
   File? _imageFile;
   bool _isLoading = false;
+  String _currentCurrency = 'USD';
 
   @override
   void initState() {
@@ -27,6 +33,26 @@ class _UploadScreenState extends State<UploadScreen> {
 
   Future<void> _initializeServices() async {
     _artService = await ArtService.create();
+    await _loadPreferredCurrency();
+  }
+
+  Future<void> _loadPreferredCurrency() async {
+    final currency = await _prefsService.getPreferredCurrency();
+    setState(() {
+      _currentCurrency = currency;
+    });
+  }
+
+  Future<String> _getFormattedPrice(double price) async {
+    try {
+      final preferredCurrency = await _prefsService.getPreferredCurrency();
+      final symbol = CurrencyUtils.getCurrencySymbol(preferredCurrency);
+      final formattedPrice = await CurrencyUtils.formatAndConvertPrice(price, 'USD');
+      return formattedPrice;
+    } catch (e) {
+      print('Error formatting price: $e');
+      return CurrencyUtils.formatPrice(price, currency: 'USD');
+    }
   }
 
   Future<void> _pickImage() async {
@@ -65,7 +91,7 @@ class _UploadScreenState extends State<UploadScreen> {
             SnackBar(content: Text('Error: ${e.toString()}')),
           );
         }
-      } finally {
+      
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -177,16 +203,33 @@ class _UploadScreenState extends State<UploadScreen> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  prefixIcon: const Icon(Icons.attach_money),
+                  prefixIcon: Icon(Icons.attach_money),
+                  prefixText: CurrencyUtils.getCurrencySymbol(_currentCurrency),
+                  suffixText: _currentCurrency,
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a price';
                   }
-                  if (double.tryParse(value) == null) {
+                  if (double.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), '')) == null) {
                     return 'Please enter a valid price';
                   }
                   return null;
+                },
+                onChanged: (value) {
+                  if (value.isNotEmpty) {
+                    final numericValue = double.tryParse(value.replaceAll(RegExp(r'[^0-9.]'), ''));
+                    if (numericValue != null) {
+                      _getFormattedPrice(numericValue).then((formattedPrice) {
+                        setState(() {
+                          _priceController.text = formattedPrice;
+                          _priceController.selection = TextSelection.fromPosition(
+                            TextPosition(offset: formattedPrice.length),
+                          );
+                        });
+                      });
+                    }
+                  }
                 },
               ),
               const SizedBox(height: 16),

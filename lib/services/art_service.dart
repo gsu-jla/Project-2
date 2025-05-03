@@ -26,10 +26,12 @@ class ArtService {
         final data = jsonDecode(response.body);
         final hits = data['hits'] as List;
         final artworks = hits.map((hit) {
+          // Generate a random price between 10 and 1000
+          final price = (hit['id'] % 990 + 10).toDouble();
           return {
             'id': hit['id'] as int,
             'title': hit['tags'] ?? 'Untitled',
-            'price': '\$${(hit['id'] % 1000).toStringAsFixed(2)}',
+            'price': price,
             'description': hit['tags'] ?? 'No description available',
             'imageUrl': hit['webformatURL'],
             'artist': 'Pixabay Artist',
@@ -54,14 +56,11 @@ class ArtService {
     required String description,
     required File imageFile,
   }) async {
-    // For demo purposes, we'll just save the artwork details
-    // In a real app, you would upload the image to a storage service
-    // and save the URL along with other details
     final artworks = _prefs.getStringList(_artworksKey) ?? [];
     final newArtwork = {
       'id': DateTime.now().millisecondsSinceEpoch,
       'title': title,
-      'price': price,
+      'price': double.parse(price.replaceAll(RegExp(r'[^0-9.]'), '')),
       'description': description,
       'imageUrl': 'https://picsum.photos/800/600?random=${DateTime.now().millisecondsSinceEpoch}',
       'artist': 'Demo Artist',
@@ -85,6 +84,10 @@ class ArtService {
       // Ensure ID is an int
       if (decoded['id'] is String) {
         decoded['id'] = int.parse(decoded['id']);
+      }
+      // Ensure price is a double
+      if (decoded['price'] is String) {
+        decoded['price'] = double.parse(decoded['price'].replaceAll(RegExp(r'[^0-9.]'), ''));
       }
       return decoded;
     }).toList();

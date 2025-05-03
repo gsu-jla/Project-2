@@ -4,6 +4,9 @@ import '../../services/art_service.dart';
 import '../../services/favorite_service.dart';
 import '../../services/cart_service.dart';
 import '../../services/collection_service.dart';
+import '../../services/user_preferences_service.dart';
+import '../../services/currency_service.dart';
+import '../../utils/currency_utils.dart';
 import '../search/search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,9 +21,12 @@ class _HomeScreenState extends State<HomeScreen> {
   late final FavoriteService _favoriteService;
   late final CartService _cartService;
   late final CollectionService _collectionService;
+  late final UserPreferencesService _prefsService;
+  late final CurrencyService _currencyService;
   List<Map<String, dynamic>> _artworks = [];
   bool _isLoading = true;
   int _selectedIndex = 0;
+  String _currentCurrency = 'USD';
 
   @override
   void initState() {
@@ -33,7 +39,29 @@ class _HomeScreenState extends State<HomeScreen> {
     _favoriteService = await FavoriteService.create();
     _cartService = await CartService.create();
     _collectionService = await CollectionService.create();
+    _prefsService = UserPreferencesService();
+    _currencyService = CurrencyService();
+    _loadPreferredCurrency();
     _loadArtworks();
+  }
+
+  Future<void> _loadPreferredCurrency() async {
+    final currency = await _prefsService.getPreferredCurrency();
+    setState(() {
+      _currentCurrency = currency;
+    });
+  }
+
+  Future<String> _getFormattedPrice(double price) async {
+    try {
+      final preferredCurrency = await _prefsService.getPreferredCurrency();
+      final symbol = CurrencyUtils.getCurrencySymbol(preferredCurrency);
+      final formattedPrice = await CurrencyUtils.formatAndConvertPrice(price, 'USD');
+      return formattedPrice;
+    } catch (e) {
+      print('Error formatting price: $e');
+      return CurrencyUtils.formatPrice(price, currency: 'USD');
+    }
   }
 
   Future<void> _loadArtworks() async {
@@ -98,10 +126,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   bool _isPurchased(int artworkId) {
-    return _cartService.isPurchased(artworkId);
+    return _cartService.isInCart(artworkId);
   }
 
   Future<void> _showPurchaseDialog(Map<String, dynamic> artwork) async {
+    final formattedPrice = await _getFormattedPrice(artwork['price']);
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -112,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text('Title: ${artwork['title']}'),
             Text('Artist: ${artwork['artist']}'),
-            Text('Price: ${artwork['price']}'),
+            Text('Price: $formattedPrice'),
             const SizedBox(height: 16),
             const Text('Are you sure you want to purchase this artwork?'),
           ],
@@ -124,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              _cartService.purchase(artwork['id']);
+              _cartService.addToCart(artwork['id']);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -450,26 +479,43 @@ class _HomeScreenState extends State<HomeScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Flexible(
+                                  flex: 1,
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
+                                      horizontal: 6,
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
                                       color: Colors.deepPurple.shade50,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: Text(
-                                      artwork['price'],
-                                      style: TextStyle(
-                                        color: Colors.deepPurple.shade700,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                    child: FutureBuilder<String>(
+                                      future: _getFormattedPrice(artwork['price']),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.connectionState == ConnectionState.waiting) {
+                                          return const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          );
+                                        }
+                                        return Text(
+                                          snapshot.data ?? '\$${artwork['price'].toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            color: Colors.deepPurple.shade700,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 1,
+                                        );
+                                      },
                                     ),
                                   ),
                                 ),
+                                const SizedBox(width: 4),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -480,28 +526,28 @@ class _HomeScreenState extends State<HomeScreen> {
                                         _isFavorite(artwork['id'])
                                             ? Icons.favorite
                                             : Icons.favorite_border,
-                                        size: 20,
+                                        size: 18,
                                         color: _isFavorite(artwork['id'])
                                             ? Colors.red
                                             : Colors.grey,
                                       ),
                                       onPressed: () => _toggleFavorite(artwork['id']),
                                     ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 4),
                                     IconButton(
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
                                       icon: const Icon(
                                         Icons.collections,
-                                        size: 20,
+                                        size: 18,
                                         color: Colors.deepPurple,
                                       ),
                                       onPressed: () => _addToCollection(artwork),
                                     ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 4),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
+                                        horizontal: 4,
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
@@ -511,7 +557,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       child: Text(
                                         artwork['likes'].toString(),
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 11,
                                           color: Colors.grey[700],
                                           fontWeight: FontWeight.bold,
                                         ),
