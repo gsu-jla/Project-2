@@ -12,7 +12,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final ArtService _artService = ArtService();
+  late final ArtService _artService;
   late final CartService _cartService;
   late final UserService _userService;
   List<Map<String, dynamic>> _artworks = [];
@@ -29,6 +29,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _initializeServices() async {
+    _artService = await ArtService.create();
     _cartService = await CartService.create();
     _userService = await UserService.create();
     _loadUserData();
