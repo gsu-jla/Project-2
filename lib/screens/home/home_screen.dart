@@ -126,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   bool _isPurchased(int artworkId) {
-    return _cartService.isInCart(artworkId);
+    return _cartService.isPurchased(artworkId);
   }
 
   Future<void> _showPurchaseDialog(Map<String, dynamic> artwork) async {
@@ -152,16 +152,34 @@ class _HomeScreenState extends State<HomeScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              _cartService.purchase(artwork['id']);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Purchase successful!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-              setState(() {}); // Refresh the UI
+            onPressed: () async {
+              try {
+                _cartService.purchase(artwork['id']);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Purchase successful!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+                // Refresh the UI
+                setState(() {
+                  _isLoading = true;
+                });
+                await _loadArtworks();
+                setState(() {
+                  _isLoading = false;
+                });
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error purchasing artwork: ${e.toString()}'),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Purchase'),
           ),

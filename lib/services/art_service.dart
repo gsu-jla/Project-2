@@ -7,13 +7,24 @@ class ArtService {
   static const String _baseUrl = 'https://pixabay.com/api/';
   static const String _apiKey = '50050223-f0431e0820c919b959d1400d4';
   static const String _artworksKey = 'artworks';
+  static const String _artworksLoadedKey = 'artworks_loaded';
   final SharedPreferences _prefs;
 
   ArtService._(this._prefs);
 
   static Future<ArtService> create() async {
     final prefs = await SharedPreferences.getInstance();
-    return ArtService._(prefs);
+    final service = ArtService._(prefs);
+    await service._ensureArtworksLoaded();
+    return service;
+  }
+
+  Future<void> _ensureArtworksLoaded() async {
+    final artworksLoaded = _prefs.getBool(_artworksLoadedKey) ?? false;
+    if (!artworksLoaded) {
+      await _loadInitialArtworks();
+      await _prefs.setBool(_artworksLoadedKey, true);
+    }
   }
 
   Future<void> _loadInitialArtworks() async {
@@ -44,6 +55,7 @@ class ArtService {
           _artworksKey,
           artworks.map((artwork) => jsonEncode(artwork)).toList(),
         );
+        print('Loaded ${artworks.length} initial artworks');
       }
     } catch (e) {
       print('Error loading initial artworks: $e');
@@ -73,17 +85,19 @@ class ArtService {
   Future<List<Map<String, dynamic>>> getArtworks() async {
     final artworks = _prefs.getStringList(_artworksKey);
     
-    // If no artworks exist, load initial artworks from Pixabay
     if (artworks == null || artworks.isEmpty) {
+      print('No artworks found, loading initial artworks');
       await _loadInitialArtworks();
       return getArtworks(); // Recursively call to get the newly loaded artworks
     }
 
-    return artworks.map((artwork) {
+    final decodedArtworks = artworks.map((artwork) {
       final decoded = jsonDecode(artwork) as Map<String, dynamic>;
       // Ensure ID is an int
       if (decoded['id'] is String) {
         decoded['id'] = int.parse(decoded['id']);
+      } else if (decoded['id'] is double) {
+        decoded['id'] = decoded['id'].toInt();
       }
       // Ensure price is a double
       if (decoded['price'] is String) {
@@ -91,5 +105,15 @@ class ArtService {
       }
       return decoded;
     }).toList();
+
+    print('Retrieved ${decodedArtworks.length} artworks');
+    return decodedArtworks;
+  }
+
+  // Add a method to clear all data (for testing)
+  Future<void> clearAllData() async {
+    await _prefs.remove(_artworksKey);
+    await _prefs.remove(_artworksLoadedKey);
+    print('Cleared all artwork data');
   }
 } 
