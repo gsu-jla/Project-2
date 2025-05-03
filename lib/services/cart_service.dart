@@ -14,11 +14,22 @@ class CartService {
     final cartString = _prefs.getString(_cartKey);
     final purchasedString = _prefs.getString(_purchasedKey);
     
-    if (cartString != null) {
-      _cart.addAll(cartString.split(',').map(int.parse));
+    if (cartString != null && cartString.isNotEmpty) {
+      try {
+        _cart.addAll(cartString.split(',').where((s) => s.isNotEmpty).map(int.parse));
+      } catch (e) {
+        print('Error parsing cart data: $e');
+        _cart.clear();
+      }
     }
-    if (purchasedString != null) {
-      _purchased.addAll(purchasedString.split(',').map(int.parse));
+    
+    if (purchasedString != null && purchasedString.isNotEmpty) {
+      try {
+        _purchased.addAll(purchasedString.split(',').where((s) => s.isNotEmpty).map(int.parse));
+      } catch (e) {
+        print('Error parsing purchased data: $e');
+        _purchased.clear();
+      }
     }
   }
 
