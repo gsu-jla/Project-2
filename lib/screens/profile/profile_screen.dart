@@ -17,15 +17,12 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late final ArtService _artService;
-  late final FavoriteService _favoriteService;
   late final CartService _cartService;
-  late final CollectionService _collectionService;
   final UserPreferencesService _prefsService = UserPreferencesService();
   final CurrencyService _currencyService = CurrencyService();
   String _currentCurrency = 'USD';
-  List<Map<String, dynamic>> _favorites = [];
-  List<Map<String, dynamic>> _cart = [];
-  List<Map<String, dynamic>> _collections = [];
+  List<Map<String, dynamic>> _purchasedArtworks = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -35,13 +32,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _initializeServices() async {
     _artService = await ArtService.create();
-    _favoriteService = await FavoriteService.create();
     _cartService = await CartService.create();
-    _collectionService = await CollectionService.create();
     await _loadPreferredCurrency();
-    await _loadFavorites();
-    await _loadCart();
-    await _loadCollections();
+    await _loadPurchasedArtworks();
   }
 
   Future<void> _loadPreferredCurrency() async {
@@ -51,25 +44,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  Future<void> _loadFavorites() async {
-    final favorites = await _favoriteService.getFavorites();
-    setState(() {
-      _favorites = favorites;
-    });
-  }
-
-  Future<void> _loadCart() async {
-    final cart = await _cartService.getCart();
-    setState(() {
-      _cart = cart;
-    });
-  }
-
-  Future<void> _loadCollections() async {
-    final collections = await _collectionService.getCollections();
-    setState(() {
-      _collections = collections;
-    });
+  Future<void> _loadPurchasedArtworks() async {
+    try {
+      final purchased = await _cartService.getPurchased();
+      setState(() {
+        _purchasedArtworks = purchased;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading purchased artworks: ${e.toString()}'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   Future<String> _getFormattedPrice(double price) async {
@@ -96,162 +90,104 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('Profile'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.pushNamed(context, '/settings');
+            },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Favorites',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 200,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: _favorites.length,
-                itemBuilder: (context, index) {
-                  final artwork = _favorites[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Card(
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: CachedNetworkImage(
-                              imageUrl: artwork['imageUrl'],
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) => const Icon(Icons.error),
-                            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Purchased Artworks',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
                           ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  artwork['title'],
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                        ),
+                        const SizedBox(height: 8),
+                        if (_purchasedArtworks.isEmpty)
+                          const Center(
+                            child: Text('No purchased artworks yet'),
+                          )
+                        else
+                          SizedBox(
+                            height: 200,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _purchasedArtworks.length,
+                              itemBuilder: (context, index) {
+                                final artwork = _purchasedArtworks[index];
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Card(
+                                    child: Column(
+                                      children: [
+                                        Expanded(
+                                          child: CachedNetworkImage(
+                                            imageUrl: artwork['imageUrl'],
+                                            fit: BoxFit.cover,
+                                            placeholder: (context, url) => const Center(
+                                              child: CircularProgressIndicator(),
+                                            ),
+                                            errorWidget: (context, url, error) => const Icon(Icons.error),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.all(8.0),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                artwork['title'],
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              FutureBuilder<String>(
+                                                future: _getFormattedPrice(artwork['price']),
+                                                builder: (context, snapshot) {
+                                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                                    return const SizedBox(
+                                                      height: 20,
+                                                      child: Center(child: CircularProgressIndicator()),
+                                                    );
+                                                  }
+                                                  return Text(
+                                                    snapshot.data ?? 'Loading...',
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                FutureBuilder<String>(
-                                  future: _getFormattedPrice(artwork['price']),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.connectionState == ConnectionState.waiting) {
-                                      return const SizedBox(
-                                        height: 20,
-                                        child: Center(child: CircularProgressIndicator()),
-                                      );
-                                    }
-                                    return Text(
-                                      snapshot.data ?? 'Loading...',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ],
+                                );
+                              },
                             ),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Shopping Cart',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _cart.length,
-              itemBuilder: (context, index) {
-                final artwork = _cart[index];
-                return ListTile(
-                  leading: CachedNetworkImage(
-                    imageUrl: artwork['imageUrl'],
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                    errorWidget: (context, url, error) => const Icon(Icons.error),
                   ),
-                  title: Text(artwork['title']),
-                  subtitle: FutureBuilder<String>(
-                    future: _getFormattedPrice(artwork['price']),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const SizedBox(
-                          height: 20,
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      return Text(snapshot.data ?? 'Loading...');
-                    },
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.remove_shopping_cart),
-                    onPressed: () async {
-                      _cartService.removeFromCart(artwork['id']);
-                      await _loadCart();
-                    },
-                  ),
-                );
-              },
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Collections',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _collections.length,
-              itemBuilder: (context, index) {
-                final collection = _collections[index];
-                return ListTile(
-                  title: Text(collection['name']),
-                  subtitle: Text('${collection['artworks'].length} artworks'),
-                  onTap: () {
-                    // Navigate to collection details
-                  },
-                );
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
 } 

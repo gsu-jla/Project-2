@@ -153,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              _cartService.addToCart(artwork['id']);
+              _cartService.purchase(artwork['id']);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(

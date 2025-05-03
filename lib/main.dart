@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'screens/home/home_screen.dart';
-import 'screens/settings_screen.dart';
+import 'screens/settings/settings_screen.dart';
 import 'screens/gallery/gallery_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/cart/shopping_cart_screen.dart';
 import 'screens/upload/upload_screen.dart';
 import 'screens/auth/sign_in_screen.dart';
 import 'screens/auth/sign_up_screen.dart';
+import 'screens/profile/profile_details_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -29,6 +30,7 @@ class MyApp extends StatelessWidget {
         '/gallery': (context) => const GalleryScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/settings': (context) => const SettingsScreen(),
+        '/profile-details': (context) => const ProfileDetailsScreen(),
         '/cart': (context) => const ShoppingCartScreen(),
         '/upload': (context) => const UploadScreen(),
         '/signin': (context) => const SignInScreen(),
